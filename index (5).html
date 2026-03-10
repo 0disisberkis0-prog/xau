@@ -1,0 +1,1798 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>XAUUSD — Gold Sentinel v3</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Bebas+Neue&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --gold:#D4AF37;--gold-l:#F5D76E;--gold-d:#7A6315;
+  --bg:#FFFFFF;--bg2:#F7F7FA;--bg3:#EFEFF4;--bg4:#E6E6EE;
+  --border:#DCDCE8;--border2:#C8C8D8;
+  --red:#D92535;--red-d:rgba(217,37,53,.08);
+  --green:#067A62;--green-d:rgba(6,122,98,.08);
+  --blue:#2563EB;
+  --text:#18182E;--muted:#6A6A82;--muted2:#A8A8BC;
+}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;overflow-x:hidden;}
+body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(180,150,20,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(180,150,20,.05) 1px,transparent 1px);background-size:56px 56px;pointer-events:none;z-index:0;}
+
+/* ══ GATE ═══════════════════════════════════════ */
+
+/* ══ APP ═════════════════════════════════════════ */
+#app{position:relative;z-index:1;display:none;}
+
+/* HEADER */
+header{border-bottom:1px solid var(--border);background:rgba(255,255,255,.97);position:sticky;top:0;z-index:100;backdrop-filter:blur(20px);box-shadow:0 1px 0 var(--border);}
+.hdr{display:flex;align-items:center;justify-content:space-between;max-width:1480px;margin:0 auto;padding:12px 24px;gap:14px;}
+.logo{font-family:'Bebas Neue',cursive;font-size:22px;letter-spacing:5px;color:var(--gold);flex-shrink:0;}
+.hdr-mid{display:flex;align-items:center;gap:12px;flex:1;justify-content:center;}
+.src-badge{font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);border:1px solid var(--border2);padding:4px 10px;border-radius:4px;letter-spacing:1px;}
+
+/* WS STATUS */
+.ws-pill{display:flex;align-items:center;gap:6px;font-family:'Space Mono',monospace;font-size:9px;padding:4px 11px;border-radius:20px;border:1px solid var(--border2);color:var(--muted);flex-shrink:0;transition:all .3s;}
+.ws-pill.connected{border-color:rgba(8,153,129,.4);color:var(--green);background:rgba(8,153,129,.06);}
+.ws-pill.error{border-color:rgba(242,54,69,.4);color:var(--red);background:var(--red-d);}
+.ws-dot{width:5px;height:5px;border-radius:50%;background:currentColor;animation:blink 1.6s infinite;}
+@keyframes blink{0%,100%{opacity:1;}50%{opacity:.25;}}
+
+/* TICK COUNTER */
+.tick-counter{font-family:'Space Mono',monospace;font-size:9px;color:var(--muted);letter-spacing:1px;}
+
+.hdr-right{display:flex;align-items:center;gap:12px;}
+.sw-wrap{display:flex;align-items:center;gap:7px;cursor:pointer;user-select:none;}
+.sw-lbl{font-size:11px;color:var(--muted);}
+.sw{width:36px;height:19px;background:var(--muted2);border-radius:10px;position:relative;transition:background .25s;border:1px solid var(--border2);}
+.sw.on{background:var(--gold-d);border-color:var(--gold);}
+.sw-k{width:13px;height:13px;border-radius:50%;background:var(--muted);position:absolute;top:2px;left:2px;transition:all .25s;}
+.sw.on .sw-k{left:19px;background:var(--gold);}
+.icon-btn{background:transparent;border:1px solid var(--border2);color:var(--muted);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;transition:all .2s;}
+.icon-btn:hover{border-color:var(--gold);color:var(--gold);}
+
+/* ══ SCALPER BAR (TOP) ═══════════════════════════ */
+.scalper-bar{
+  background:var(--bg2);
+  border-bottom:1px solid var(--border);
+  padding:10px 24px;
+  display:flex;align-items:center;gap:20px;
+  overflow-x:auto;
+  max-width:100%;
+}
+.scalper-bar::-webkit-scrollbar{display:none;}
+.sb-item{display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0;}
+.sb-label{font-family:'Space Mono',monospace;font-size:8px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;}
+.sb-val{font-family:'Space Mono',monospace;font-size:13px;font-weight:700;}
+.sb-divider{width:1px;height:32px;background:var(--border);flex-shrink:0;}
+
+/* ══ WRAP ════════════════════════════════════════ */
+.wrap{max-width:1480px;margin:0 auto;padding:20px 24px;}
+
+/* ══ PRICE BAND ══════════════════════════════════ */
+.price-band{
+  display:grid;grid-template-columns:auto 1fr 1fr 1fr 1fr;
+  gap:14px;align-items:center;
+  padding:24px 28px;
+  background:var(--bg2);border:1px solid var(--border);border-radius:16px;
+  margin-bottom:18px;position:relative;overflow:hidden;
+}
+.price-band::before{content:'';position:absolute;left:-40px;top:-40px;width:180px;height:180px;background:radial-gradient(circle,rgba(212,175,55,.07) 0%,transparent 70%);pointer-events:none;}
+.p-ticker{font-family:'Space Mono',monospace;font-size:10px;color:var(--muted);letter-spacing:3px;margin-bottom:4px;}
+.p-num{
+  font-family:'Bebas Neue',cursive;font-size:64px;line-height:1;
+  color:var(--gold);letter-spacing:2px;
+  transition:color .15s;
+}
+.p-num.up{color:var(--green);}
+.p-num.dn{color:var(--red);}
+.p-chg-row{display:flex;align-items:center;gap:8px;margin-top:6px;}
+.chg-pill{font-family:'Space Mono',monospace;font-size:12px;font-weight:700;padding:3px 10px;border-radius:5px;}
+.chg-pill.up{background:var(--green-d);color:var(--green);}
+.chg-pill.dn{background:var(--red-d);color:var(--red);}
+.chg-pill.neu{background:rgba(212,175,55,.1);color:var(--gold);}
+.chg-time{font-size:10px;color:var(--muted);font-family:'Space Mono',monospace;}
+.stat-tile{background:var(--bg3);border:1px solid var(--border);border-radius:11px;padding:16px 18px;transition:border-color .2s;}
+.stat-tile:hover{border-color:var(--gold-d);}
+.st-lbl{font-size:9px;color:var(--muted);letter-spacing:2px;text-transform:uppercase;margin-bottom:8px;}
+.st-val{font-family:'Space Mono',monospace;font-size:16px;font-weight:700;}
+.st-sub{font-size:10px;color:var(--muted);margin-top:4px;}
+
+/* ══ CHART ═══════════════════════════════════════ */
+.chart-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:20px 22px;margin-bottom:18px;}
+.chart-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;}
+.chart-lbl{font-family:'Space Mono',monospace;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);}
+.spin{display:inline-block;animation:rot 1.4s linear infinite;color:var(--muted);font-size:13px;margin-left:6px;}
+@keyframes rot{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+.tf-row{display:flex;gap:5px;}
+.tf{font-family:'Space Mono',monospace;font-size:9px;padding:4px 10px;border-radius:5px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;transition:all .18s;}
+.tf.act,.tf:hover{border-color:var(--gold);color:var(--gold);background:rgba(212,175,55,.07);}
+
+/* ══ MAIN GRID ═══════════════════════════════════ */
+.main-grid{display:grid;grid-template-columns:1fr 350px;gap:18px;margin-bottom:18px;}
+.sec-lbl{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:3px;text-transform:uppercase;color:var(--gold);margin-bottom:10px;}
+
+/* NEWS */
+.news-list{display:flex;flex-direction:column;gap:9px;}
+.nc{background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:13px 15px;display:flex;gap:11px;cursor:pointer;transition:all .18s;position:relative;overflow:hidden;}
+.nc::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;}
+.nc.hi::before{background:var(--red);}
+.nc.md::before{background:var(--gold);}
+.nc.lo::before{background:var(--muted);}
+.nc:hover{transform:translateX(2px);border-color:var(--border2);}
+.nc-ico{flex-shrink:0;width:26px;height:26px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-size:13px;}
+.nc.hi .nc-ico{background:var(--red-d);}
+.nc.md .nc-ico{background:rgba(212,175,55,.1);}
+.nc.lo .nc-ico{background:rgba(92,92,114,.08);}
+.nc-body{flex:1;}
+.nc-imp{font-size:8px;letter-spacing:2px;text-transform:uppercase;font-family:'Space Mono',monospace;margin-bottom:4px;}
+.nc.hi .nc-imp{color:var(--red);}
+.nc.md .nc-imp{color:var(--gold);}
+.nc.lo .nc-imp{color:var(--muted);}
+.nc-ttl{font-size:12px;line-height:1.5;font-weight:500;margin-bottom:5px;}
+.nc-meta{display:flex;justify-content:space-between;font-size:9px;color:var(--muted);font-family:'Space Mono',monospace;}
+
+/* SIDEBAR */
+.sidebar{display:flex;flex-direction:column;gap:13px;}
+.panel{background:var(--bg2);border:1px solid var(--border);border-radius:13px;overflow:hidden;}
+.panel-hd{padding:13px 16px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+.panel-title{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);}
+.panel-cnt{font-family:'Space Mono',monospace;font-size:9px;background:rgba(212,175,55,.12);color:var(--gold);padding:2px 7px;border-radius:9px;}
+
+/* FEED */
+.feed{max-height:300px;overflow-y:auto;}
+.feed::-webkit-scrollbar{width:2px;}
+.feed::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px;}
+.fi{padding:11px 16px;border-bottom:1px solid rgba(37,37,48,.5);display:flex;gap:9px;animation:fslide .3s ease;transition:background .15s;}
+.fi:hover{background:rgba(255,255,255,.013);}
+@keyframes fslide{from{opacity:0;transform:translateX(-6px);}to{opacity:1;transform:translateX(0);}}
+.fi-icon{font-size:14px;flex-shrink:0;margin-top:1px;}
+.fi-bd{flex:1;}
+.fi-tag{display:inline-block;font-size:7px;letter-spacing:1.5px;padding:1px 5px;border-radius:3px;text-transform:uppercase;margin-bottom:3px;font-family:'Space Mono',monospace;}
+.tag-spike{background:rgba(242,54,69,.15);color:var(--red);}
+.tag-ws{background:rgba(8,153,129,.12);color:var(--green);}
+.tag-level{background:rgba(212,175,55,.15);color:var(--gold);}
+.tag-ai{background:rgba(168,85,247,.15);color:#a855f7;}
+.tag-sys{background:rgba(59,130,246,.1);color:var(--blue);}
+.fi-msg{font-size:11px;line-height:1.5;}
+.fi-time{font-family:'Space Mono',monospace;font-size:8px;color:var(--muted);margin-top:2px;}
+
+/* LEVELS */
+.lv-row{display:flex;justify-content:space-between;align-items:center;padding:8px 16px;border-bottom:1px solid rgba(37,37,48,.4);transition:background .12s;}
+.lv-row:hover{background:rgba(255,255,255,.018);}
+.lv-row.current-zone{background:rgba(212,175,55,.05);}
+.lv-name{font-size:11px;color:var(--muted);}
+.lv-val{font-family:'Space Mono',monospace;font-size:11px;font-weight:700;}
+.lv-val.res{color:var(--red);}
+.lv-val.sup{color:var(--green);}
+.lv-val.pvt{color:var(--gold);}
+.lv-dist{font-family:'Space Mono',monospace;font-size:8px;color:var(--muted);text-align:right;margin-top:1px;}
+
+/* AI */
+.ai-card{background:var(--bg2);border:1px solid rgba(168,85,247,.2);border-radius:16px;padding:22px;margin-bottom:18px;position:relative;overflow:hidden;}
+.ai-card::after{content:'';position:absolute;top:-60px;right:-60px;width:200px;height:200px;background:radial-gradient(circle,rgba(168,85,247,.05) 0%,transparent 70%);pointer-events:none;}
+.ai-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:13px;}
+.ai-lbl{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:3px;color:#a855f7;text-transform:uppercase;}
+.ai-dots{display:flex;gap:3px;align-items:center;}
+.ai-dot{width:4px;height:4px;border-radius:50%;background:#a855f7;animation:db 1.2s infinite;}
+.ai-dot:nth-child(2){animation-delay:.2s;}
+.ai-dot:nth-child(3){animation-delay:.4s;}
+@keyframes db{0%,100%{transform:translateY(0);opacity:.4;}50%{transform:translateY(-4px);opacity:1;}}
+.ai-text{font-size:13px;line-height:1.8;color:#C4C4D6;min-height:50px;}
+.ai-footer{display:flex;flex-wrap:wrap;gap:7px;margin-top:14px;padding-top:12px;border-top:1px solid var(--border);}
+.ai-pill{font-size:10px;padding:4px 12px;border-radius:20px;font-weight:500;}
+.pill-bull{background:var(--green-d);color:var(--green);border:1px solid rgba(8,153,129,.3);}
+.pill-bear{background:var(--red-d);color:var(--red);border:1px solid rgba(242,54,69,.3);}
+.pill-neu{background:rgba(212,175,55,.1);color:var(--gold);border:1px solid rgba(212,175,55,.25);}
+
+/* ALERT SETUP */
+.setup-card{background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:22px;margin-bottom:18px;}
+.setup-grid{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:10px;align-items:end;margin-top:14px;}
+.fg{display:flex;flex-direction:column;gap:5px;}
+.fg label{font-size:9px;color:var(--muted);letter-spacing:1.5px;text-transform:uppercase;}
+.fi-inp,.fi-sel{background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:9px 12px;border-radius:8px;font-family:'Space Mono',monospace;font-size:11px;outline:none;transition:border-color .2s;width:100%;}
+.fi-inp:focus,.fi-sel:focus{border-color:var(--gold);}
+.add-btn{background:var(--gold);color:var(--bg);border:none;padding:9px 18px;border-radius:8px;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;cursor:pointer;transition:all .2s;white-space:nowrap;}
+.add-btn:hover{background:var(--gold-l);}
+.chips{display:flex;flex-wrap:wrap;gap:7px;margin-top:12px;}
+.chip{display:flex;align-items:center;gap:7px;background:var(--bg3);border:1px solid var(--border2);border-radius:6px;padding:5px 10px;font-family:'Space Mono',monospace;font-size:9px;}
+.chip-x{cursor:pointer;color:var(--muted);transition:color .15s;}
+.chip-x:hover{color:var(--red);}
+
+/* ══ FULLSCREEN ALERT ════════════════════════════ */
+#fsAlert{
+  position:fixed;inset:0;
+  display:none;
+  align-items:center;justify-content:center;
+  z-index:900;
+  animation:fsIn .2s ease;
+}
+@keyframes fsIn{from{opacity:0;}to{opacity:1;}}
+.fs-bg{
+  position:absolute;inset:0;
+  background:rgba(9,9,11,.96);
+  backdrop-filter:blur(8px);
+}
+/* animated border */
+.fs-bg::before{
+  content:'';
+  position:absolute;inset:0;
+  background:repeating-linear-gradient(
+    0deg,
+    transparent,transparent 3px,
+    rgba(242,54,69,.06) 3px,rgba(242,54,69,.06) 4px
+  );
+  animation:scanlines .5s linear infinite;
+}
+@keyframes scanlines{from{background-position:0 0;}to{background-position:0 4px;}}
+.fs-content{
+  position:relative;z-index:1;
+  text-align:center;
+  padding:60px 48px;
+  max-width:640px;
+  width:90%;
+}
+.fs-tag{
+  font-family:'Space Mono',monospace;
+  font-size:10px;letter-spacing:4px;text-transform:uppercase;
+  color:var(--red);margin-bottom:16px;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+}
+.fs-tag::before,.fs-tag::after{content:'';flex:1;max-width:60px;height:1px;background:var(--red);opacity:.4;}
+.fs-price{
+  font-family:'Bebas Neue',cursive;
+  font-size:96px;line-height:1;
+  letter-spacing:2px;
+  margin-bottom:8px;
+}
+.fs-price.up{color:var(--green);}
+.fs-price.dn{color:var(--red);}
+.fs-move{
+  font-family:'Space Mono',monospace;
+  font-size:20px;font-weight:700;
+  margin-bottom:8px;
+}
+.fs-move.up{color:var(--green);}
+.fs-move.dn{color:var(--red);}
+.fs-msg{font-size:15px;color:var(--muted);line-height:1.6;margin-bottom:32px;}
+.fs-pips{
+  display:inline-block;
+  font-family:'Bebas Neue',cursive;
+  font-size:44px;letter-spacing:2px;
+  padding:8px 32px;
+  border-radius:10px;
+  margin-bottom:32px;
+}
+.fs-pips.up{background:var(--green-d);color:var(--green);border:1px solid rgba(8,153,129,.3);}
+.fs-pips.dn{background:var(--red-d);color:var(--red);border:1px solid rgba(242,54,69,.3);}
+.fs-close{
+  background:transparent;
+  border:1px solid var(--border2);
+  color:var(--muted);
+  padding:11px 32px;
+  border-radius:8px;
+  font-family:'Space Mono',monospace;
+  font-size:11px;cursor:pointer;
+  transition:all .2s;letter-spacing:2px;
+  display:block;margin:0 auto;
+}
+.fs-close:hover{border-color:var(--gold);color:var(--gold);}
+.fs-auto-close{
+  font-family:'Space Mono',monospace;
+  font-size:10px;color:var(--muted);
+  margin-top:12px;
+}
+/* pulsing red border around screen */
+.fs-pulse{
+  position:absolute;inset:0;
+  border:3px solid transparent;
+  animation:borderPulse 1s ease-in-out infinite;
+  pointer-events:none;
+}
+@keyframes borderPulse{
+  0%,100%{border-color:rgba(242,54,69,0);box-shadow:inset 0 0 60px rgba(242,54,69,0);}
+  50%{border-color:rgba(242,54,69,.6);box-shadow:inset 0 0 60px rgba(242,54,69,.08);}
+}
+.fs-pulse.up-pulse{
+  animation:borderPulseGreen 1s ease-in-out infinite;
+}
+@keyframes borderPulseGreen{
+  0%,100%{border-color:rgba(8,153,129,0);box-shadow:inset 0 0 60px rgba(8,153,129,0);}
+  50%{border-color:rgba(8,153,129,.6);box-shadow:inset 0 0 60px rgba(8,153,129,.08);}
+}
+
+/* TOAST */
+.toast-wrap{position:fixed;top:68px;right:16px;z-index:800;display:flex;flex-direction:column;gap:9px;pointer-events:none;}
+.toast{background:var(--bg2);border:1px solid var(--border2);border-radius:11px;padding:13px 15px;min-width:270px;max-width:330px;pointer-events:all;animation:tIn .3s cubic-bezier(.175,.885,.32,1.275);box-shadow:0 20px 50px rgba(0,0,0,.55);}
+.toast.spike{border-left:3px solid var(--red);}
+.toast.level{border-left:3px solid var(--gold);}
+.toast.ws-t{border-left:3px solid var(--green);}
+@keyframes tIn{from{opacity:0;transform:translateX(14px) scale(.96);}to{opacity:1;transform:translateX(0) scale(1);}}
+.toast-hd{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;}
+.toast-ttl{font-family:'Space Mono',monospace;font-size:9px;letter-spacing:2px;text-transform:uppercase;}
+.toast.spike .toast-ttl{color:var(--red);}
+.toast.level .toast-ttl{color:var(--gold);}
+.toast.ws-t .toast-ttl{color:var(--green);}
+.toast-x{cursor:pointer;color:var(--muted);font-size:15px;line-height:1;}
+.toast-msg{font-size:11px;line-height:1.5;}
+.toast-ts{font-size:8px;color:var(--muted);margin-top:4px;font-family:'Space Mono',monospace;}
+
+/* ERR BANNER */
+.err-banner{background:rgba(242,54,69,.07);border:1px solid rgba(242,54,69,.25);border-radius:9px;padding:12px 16px;font-size:11px;color:var(--red);font-family:'Space Mono',monospace;margin-bottom:14px;display:none;}
+
+/* FOOTER */
+/* ── CHATBOT PANEL ────────────────────────────── */
+.chat-fab{
+  position:fixed;bottom:28px;right:28px;z-index:400;
+  width:56px;height:56px;border-radius:50%;
+  background:linear-gradient(135deg,var(--gold),rgba(212,175,55,.7));
+  border:none;color:var(--bg);font-size:22px;
+  cursor:pointer;transition:all .25s;
+  box-shadow:0 8px 32px rgba(212,175,55,.3);
+  display:flex;align-items:center;justify-content:center;
+}
+.chat-fab:hover{transform:scale(1.08) translateY(-2px);box-shadow:0 12px 40px rgba(212,175,55,.4);}
+.chat-fab.open{background:var(--muted2);box-shadow:none;}
+.chat-panel{
+  position:fixed;bottom:0;right:0;
+  width:420px;height:100vh;
+  background:rgba(255,255,255,.98);
+  border-left:1px solid var(--border2);
+  z-index:350;
+  display:flex;flex-direction:column;
+  transform:translateX(100%);
+  transition:transform .3s cubic-bezier(.4,0,.2,1);
+  backdrop-filter:blur(20px);
+}
+.chat-panel.open{transform:translateX(0);}
+.cp-header{
+  padding:14px 18px;
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;
+  flex-shrink:0;
+  background:rgba(15,15,19,.9);
+}
+.cp-title{
+  font-family:'Bebas Neue',cursive;
+  font-size:16px;letter-spacing:3px;color:var(--gold);
+}
+.cp-sub{font-family:'Space Mono',monospace;font-size:7px;color:var(--muted);letter-spacing:1.5px;margin-top:2px;}
+.cp-close{
+  background:transparent;border:1px solid var(--border2);
+  color:var(--muted);width:28px;height:28px;
+  border-radius:7px;cursor:pointer;font-size:14px;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .2s;
+}
+.cp-close:hover{border-color:var(--red);color:var(--red);}
+.cp-messages{
+  flex:1;overflow-y:auto;padding:16px;
+  scroll-behavior:smooth;
+}
+.cp-messages::-webkit-scrollbar{width:2px;}
+.cp-messages::-webkit-scrollbar-thumb{background:var(--border2);}
+.cp-msg-user{display:flex;justify-content:flex-end;margin-bottom:12px;animation:cpIn .2s ease;}
+.cp-msg-user-bbl{
+  max-width:80%;
+  background:rgba(212,175,55,.12);
+  border:1px solid rgba(212,175,55,.2);
+  border-radius:14px 14px 3px 14px;
+  padding:10px 14px;font-size:13px;line-height:1.55;
+  font-family:'DM Sans',sans-serif;
+}
+.cp-msg-ai{display:flex;gap:8px;margin-bottom:12px;align-items:flex-start;animation:cpIn .2s ease;}
+@keyframes cpIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+.cp-avatar{
+  width:28px;height:28px;flex-shrink:0;
+  background:rgba(212,175,55,.12);border:1px solid rgba(212,175,55,.2);
+  border-radius:8px;display:flex;align-items:center;justify-content:center;
+  font-size:13px;
+}
+.cp-bbl{
+  flex:1;background:var(--bg3);border:1px solid var(--border);
+  border-radius:3px 14px 14px 14px;
+  padding:10px 14px;font-size:13px;line-height:1.65;
+  font-family:'DM Sans',sans-serif;
+}
+.cp-bbl strong{color:var(--gold);}
+.cp-verdict{
+  display:inline-flex;align-items:center;gap:4px;
+  font-family:'Space Mono',monospace;font-size:8px;
+  padding:3px 8px;border-radius:4px;margin-top:8px;font-weight:700;
+}
+.cp-verdict.bull{background:var(--green-d);color:var(--green);}
+.cp-verdict.bear{background:var(--red-d);color:var(--red);}
+.cp-verdict.warn{background:rgba(212,175,55,.1);color:var(--gold);}
+.cp-verdict.neut{background:rgba(92,92,114,.1);color:var(--muted);}
+.cp-typing{display:flex;gap:8px;margin-bottom:12px;align-items:center;}
+.cp-typing-bbl{
+  background:var(--bg3);border:1px solid var(--border);
+  border-radius:3px 14px 14px 14px;
+  padding:10px 14px;display:flex;gap:4px;align-items:center;
+}
+.cp-dot{width:4px;height:4px;border-radius:50%;background:var(--gold);animation:cpd 1.2s infinite;}
+.cp-dot:nth-child(2){animation-delay:.2s;}
+.cp-dot:nth-child(3){animation-delay:.4s;}
+@keyframes cpd{0%,100%{opacity:.2;transform:translateY(0);}50%{opacity:1;transform:translateY(-3px);}}
+.cp-inp-area{
+  padding:12px;border-top:1px solid var(--border);
+  flex-shrink:0;background:rgba(248,248,250,.97);
+}
+.cp-inp-row{display:flex;gap:8px;align-items:flex-end;}
+.cp-inp{
+  flex:1;background:var(--bg3);border:1px solid var(--border2);
+  color:var(--text);padding:10px 14px;border-radius:10px;
+  font-family:'DM Sans',sans-serif;font-size:13px;
+  outline:none;resize:none;min-height:40px;max-height:100px;
+  transition:border-color .2s;
+}
+.cp-inp:focus{border-color:rgba(212,175,55,.4);}
+.cp-inp::placeholder{color:var(--muted);font-style:italic;}
+.cp-send{
+  width:40px;height:40px;flex-shrink:0;
+  background:var(--gold);border:none;border-radius:9px;
+  color:var(--bg);font-size:16px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  transition:all .2s;
+}
+.cp-send:hover{filter:brightness(1.1);}
+.cp-send:disabled{opacity:.4;cursor:not-allowed;}
+.cp-welcome{
+  text-align:center;padding:24px 12px;
+  font-size:12px;color:var(--muted);line-height:1.8;
+}
+.cp-welcome-title{
+  font-family:'Bebas Neue',cursive;
+  font-size:18px;letter-spacing:3px;color:var(--gold);margin-bottom:8px;
+}
+.cp-qbs{display:flex;flex-direction:column;gap:6px;margin-top:14px;}
+.cp-qb{
+  font-family:'Space Mono',monospace;font-size:9px;
+  padding:7px 12px;border-radius:7px;
+  border:1px solid var(--border2);background:transparent;
+  color:var(--muted);cursor:pointer;transition:all .2s;
+  text-align:left;
+}
+.cp-qb:hover{border-color:var(--gold);color:var(--gold);background:var(--gold-d);}
+@media(max-width:480px){.chat-panel{width:100%;}}
+
+footer{border-top:1px solid var(--border);padding:18px 0;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;}
+.ft-l{font-size:10px;color:var(--muted);font-family:'Space Mono',monospace;}
+.ft-d{font-size:9px;color:var(--muted2);max-width:580px;line-height:1.7;}
+
+@media(max-width:1024px){.price-band{grid-template-columns:1fr 1fr;}.main-grid{grid-template-columns:1fr;}.setup-grid{grid-template-columns:1fr 1fr;}}
+@media(max-width:640px){.p-num{font-size:46px;}.setup-grid{grid-template-columns:1fr;}.wrap{padding:14px;}.price-band{grid-template-columns:1fr;padding:18px;}.scalper-bar{padding:8px 14px;}}
+</style>
+</head>
+<body>
+
+<!-- ══ GATE ══════════════════════════════════════ -->
+<!-- Gate removed — keys embedded -->
+
+<!-- ══ APP ═══════════════════════════════════════ -->
+<div id="app" style="display:block">
+
+<header>
+  <div class="hdr">
+    <div class="logo">⬡ GOLD SENTINEL</div>
+    <div class="hdr-mid">
+      <div class="src-badge" id="srcBadge">FINNHUB WS · TWELVE DATA · XAUUSD</div>
+      <div class="ws-pill" id="wsPill">
+        <div class="ws-dot"></div>
+        <span id="wsStatus">BAĞLANIYOR</span>
+      </div>
+      <div class="tick-counter" id="tickCtr">TICKS: 0</div>
+    </div>
+    <div class="hdr-right">
+      <div class="sw-wrap" onclick="toggleAlerts()">
+        <span class="sw-lbl">Uyarılar</span>
+        <div class="sw on" id="sw"><div class="sw-k"></div></div>
+      </div>
+      <button class="icon-btn" title="Threshold ayarla" onclick="showThresholdMenu()">⚙</button>
+    </div>
+  </div>
+</header>
+
+<!-- SCALPER BAR -->
+<div class="scalper-bar" id="scalperBar">
+  <div class="sb-item">
+    <div class="sb-label">BID</div>
+    <div class="sb-val" id="sbBid" style="color:var(--green)">—</div>
+  </div>
+  <div class="sb-divider"></div>
+  <div class="sb-item">
+    <div class="sb-label">ASK</div>
+    <div class="sb-val" id="sbAsk" style="color:var(--red)">—</div>
+  </div>
+  <div class="sb-divider"></div>
+  <div class="sb-item">
+    <div class="sb-label">SPREAD</div>
+    <div class="sb-val" id="sbSpread" style="color:var(--gold)">—</div>
+  </div>
+  <div class="sb-divider"></div>
+  <div class="sb-item">
+    <div class="sb-label">1D DEĞ</div>
+    <div class="sb-val" id="sbDay">—</div>
+  </div>
+  <div class="sb-divider"></div>
+  <div class="sb-item">
+    <div class="sb-label">SON HAREKET</div>
+    <div class="sb-val" id="sbMove">—</div>
+  </div>
+  <div class="sb-divider"></div>
+  <div class="sb-item">
+    <div class="sb-label">UYARI EŞİĞİ</div>
+    <div class="sb-val" id="sbThresh" style="color:var(--gold)">2.0 USD</div>
+  </div>
+  <div class="sb-divider"></div>
+  <div class="sb-item">
+    <div class="sb-label">SON UYARI</div>
+    <div class="sb-val" id="sbLastAlert" style="font-size:10px;color:var(--muted)">—</div>
+  </div>
+  <div class="sb-divider"></div>
+  <div class="sb-item">
+    <div class="sb-label">NEW YORK</div>
+    <div class="sb-val" id="sbNYTime" style="color:var(--gold);font-size:12px;letter-spacing:1px">--:--:--</div>
+  </div>
+  <div class="sb-divider"></div>
+  <div class="sb-item">
+    <div class="sb-label">OTURUM</div>
+    <div class="sb-val" id="sbSession" style="font-size:11px">—</div>
+  </div>
+  <div class="sb-divider"></div>
+  <div class="sb-item">
+    <div class="sb-label">NYMEX KAPAT</div>
+    <div class="sb-val" id="sbNymexClose" style="font-size:11px;color:var(--muted)">—</div>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="err-banner" id="errBanner"></div>
+
+  <!-- PRICE BAND -->
+  <div class="price-band">
+    <div>
+      <div class="p-ticker">XAU / USD — ALTIN / DOLAR</div>
+      <div class="p-num" id="pNum">——</div>
+      <div class="p-chg-row">
+        <span class="chg-pill neu" id="chgPill">—</span>
+        <span class="chg-time" id="chgTime">—</span>
+      </div>
+    </div>
+    <div class="stat-tile">
+      <div class="st-lbl">Gün Yüksek / Düşük</div>
+      <div class="st-val" id="hiLo" style="color:var(--gold)">—</div>
+      <div class="st-sub" id="hiLoSub">—</div>
+    </div>
+    <div class="stat-tile">
+      <div class="st-lbl">52 Hafta H/L</div>
+      <div class="st-val" id="w52" style="color:var(--muted)">—</div>
+      <div class="st-sub" id="w52sub">—</div>
+    </div>
+    <div class="stat-tile">
+      <div class="st-lbl">Volatilite</div>
+      <div class="st-val" id="momVal" style="font-size:13px;margin-top:2px">—</div>
+      <div class="st-sub" id="momSub">—</div>
+    </div>
+    <div class="stat-tile">
+      <div class="st-lbl">Tick Hızı</div>
+      <div class="st-val" id="tickRate" style="color:var(--gold)">—</div>
+      <div class="st-sub" id="tickRateSub">Son 10s</div>
+    </div>
+  </div>
+
+  <!-- CHART (Twelve Data) -->
+  <div class="chart-card">
+    <div class="chart-head">
+      <div style="display:flex;align-items:center;">
+        <span class="chart-lbl">Fiyat Grafiği — Twelve Data</span>
+        <span class="spin" id="chartSpin" style="display:none">↻</span>
+      </div>
+      <div class="tf-row">
+        <button class="tf act" onclick="switchTF(this,'1min')">1D</button>
+        <button class="tf" onclick="switchTF(this,'5min')">5D</button>
+        <button class="tf" onclick="switchTF(this,'15min')">15D</button>
+        <button class="tf" onclick="switchTF(this,'1h')">1S</button>
+        <button class="tf" onclick="switchTF(this,'1day')">1G</button>
+      </div>
+    </div>
+    <canvas id="chart" height="190"></canvas>
+  </div>
+
+  <!-- AI -->
+  <div class="ai-card">
+    <div class="ai-head">
+      <span class="ai-lbl">⚡ AI Market Analizi</span>
+      <div class="ai-dots" id="aiDots" style="display:none">
+        <div class="ai-dot"></div><div class="ai-dot"></div><div class="ai-dot"></div>
+      </div>
+    </div>
+    <div class="ai-text" id="aiText">Piyasa verileri bekleniyor...</div>
+    <div class="ai-footer" id="aiFooter"></div>
+  </div>
+
+  <!-- MAIN GRID -->
+  <div class="main-grid">
+    <div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+        <div class="sec-lbl" style="margin-bottom:0">📰 Haberler & Ekonomik Takvim</div>
+        <div style="display:flex;gap:5px;">
+          <button class="tf act" id="tabNews" onclick="switchNewsTab('news')">Haberler</button>
+          <button class="tf" id="tabCal" onclick="switchNewsTab('cal')">Takvim</button>
+          <button class="tf" id="tabRefresh" onclick="fetchFinnhubAll()" title="Yenile">↻</button>
+        </div>
+      </div>
+      <div id="newsLoading" style="text-align:center;padding:20px;color:var(--muted);font-family:'Space Mono',monospace;font-size:11px;display:none;">⟳ Yükleniyor...</div>
+      <div id="newsError" style="display:none;background:rgba(242,54,69,.07);border:1px solid rgba(242,54,69,.2);border-radius:8px;padding:12px;font-size:11px;color:var(--red);font-family:'Space Mono',monospace;margin-bottom:10px;"></div>
+      <div class="news-list" id="newsList"></div>
+    </div>
+    <div class="sidebar">
+      <div class="panel">
+        <div class="panel-hd">
+          <span class="panel-title">🔔 Anlık Akış</span>
+          <span class="panel-cnt" id="alertCnt">0</span>
+        </div>
+        <div class="feed" id="feed">
+          <div style="padding:18px;text-align:center;color:var(--muted);font-size:11px;">WebSocket bekleniyor...</div>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-hd"><span class="panel-title">📊 Kritik Seviyeler</span></div>
+        <div id="levelsBody"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- CUSTOM ALERTS -->
+  <div class="setup-card">
+    <div class="sec-lbl">⚙️ Özel Fiyat Uyarısı</div>
+    <div class="setup-grid">
+      <div class="fg"><label>Fiyat (USD)</label><input type="number" class="fi-inp" id="aPrice" placeholder="3050" step="0.1"></div>
+      <div class="fg"><label>Koşul</label>
+        <select class="fi-sel" id="aCond">
+          <option value="above">↑ Yukarı Kırarsa</option>
+          <option value="below">↓ Aşağı Kırarsa</option>
+        </select>
+      </div>
+      <div class="fg"><label>Not</label><input type="text" class="fi-inp" id="aNote" placeholder="Direnç kırılımı"></div>
+      <button class="add-btn" onclick="addCustomAlert()">+ EKLE</button>
+    </div>
+    <div class="chips" id="chips"></div>
+  </div>
+
+  <footer>
+    <div class="ft-l">GOLD SENTINEL V3 · FINNHUB WS + TWELVE DATA</div>
+    <div class="ft-d">⚠ Yalnızca bilgilendirme amaçlıdır. Yatırım tavsiyesi değildir. Tüm kararlar yatırımcının sorumluluğundadır.</div>
+  </footer>
+</div>
+</div>
+
+<!-- ══ FULLSCREEN ALERT ═══════════════════════════ -->
+<div id="fsAlert">
+  <div class="fs-bg"></div>
+  <div class="fs-pulse" id="fsPulse"></div>
+  <div class="fs-content">
+    <div class="fs-tag">⚡ ANİ FİYAT HAREKETİ ⚡</div>
+    <div class="fs-price" id="fsPrice">——</div>
+    <div class="fs-pips" id="fsPips">+0.00</div>
+    <div class="fs-move" id="fsMove">——</div>
+    <div class="fs-msg" id="fsMsg">Piyasada ani hareket tespit edildi.</div>
+    <button class="fs-close" onclick="closeFsAlert()">KAPAT (ESC)</button>
+    <div class="fs-auto-close" id="fsAutoClose">10 saniye sonra otomatik kapanır</div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toasts"></div>
+
+<!-- THRESHOLD MENU -->
+<div id="threshMenu" style="display:none;position:fixed;top:56px;right:16px;z-index:500;background:var(--bg2);border:1px solid var(--border2);border-radius:12px;padding:18px;min-width:240px;box-shadow:0 20px 50px rgba(0,0,0,.5);">
+  <div style="font-family:'Space Mono',monospace;font-size:9px;color:var(--gold);letter-spacing:2px;margin-bottom:12px;">UYARI EŞİĞİ</div>
+  <div style="font-size:11px;color:var(--muted);margin-bottom:10px;">Tam ekran uyarı kaç USD harekette tetiklensin?</div>
+  <div style="display:flex;gap:8px;align-items:center;">
+    <input type="number" id="threshInput" value="2" min="0.5" max="50" step="0.5"
+      style="flex:1;background:var(--bg3);border:1px solid var(--border2);color:var(--text);padding:8px 12px;border-radius:7px;font-family:'Space Mono',monospace;font-size:12px;outline:none;">
+    <button onclick="saveThreshold()" style="background:var(--gold);color:var(--bg);border:none;padding:8px 14px;border-radius:7px;font-family:'Space Mono',monospace;font-size:10px;font-weight:700;cursor:pointer;">KAYDET</button>
+  </div>
+  <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap;">
+    <button onclick="setThresh(1)" style="background:var(--bg3);border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:5px;font-family:'Space Mono',monospace;font-size:9px;cursor:pointer;">1 USD</button>
+    <button onclick="setThresh(2)" style="background:var(--bg3);border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:5px;font-family:'Space Mono',monospace;font-size:9px;cursor:pointer;">2 USD</button>
+    <button onclick="setThresh(5)" style="background:var(--bg3);border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:5px;font-family:'Space Mono',monospace;font-size:9px;cursor:pointer;">5 USD</button>
+    <button onclick="setThresh(10)" style="background:var(--bg3);border:1px solid var(--border);color:var(--muted);padding:4px 10px;border-radius:5px;font-family:'Space Mono',monospace;font-size:9px;cursor:pointer;">10 USD</button>
+  </div>
+</div>
+
+<!-- ══ CHATBOT FAB ════════════════════════════════ -->
+<button class="chat-fab" id="chatFab" onclick="toggleChat()" title="AI Danışman">⬡</button>
+
+<div class="chat-panel" id="chatPanel">
+  <div class="cp-header">
+    <div>
+      <div class="cp-title">SENTINEL AI</div>
+      <div class="cp-sub">XAUUSD · ICT · SMART MONEY DANIŞMANI</div>
+    </div>
+    <button class="cp-close" onclick="toggleChat()">×</button>
+  </div>
+  <div class="cp-messages" id="cpMessages">
+    <div class="cp-welcome">
+      <div class="cp-welcome-title">⬡ SENTINEL AI</div>
+      Likidite, FVG, Order Block ve Smart Money konseptleri üzerine istişare edebiliriz.
+      Alım/satım kararlarını birlikte değerlendirelim.
+      <div class="cp-qbs">
+        <button class="cp-qb" onclick="cpQuick('Şu an alım bölgesinde miyiz?')">🎯 Şu an alım bölgesinde miyiz?</button>
+        <button class="cp-qb" onclick="cpQuick('Piyasa yapısını analiz et, trend yönü nedir?')">📈 Piyasa yapısı analizi</button>
+        <button class="cp-qb" onclick="cpQuick('Bugün için önemli likidite seviyeleri neler?')">💧 Likidite seviyeleri</button>
+        <button class="cp-qb" onclick="cpQuick('NY açılışında nasıl pozisyon almalıyım?')">⚡ NY açılış stratejisi</button>
+      </div>
+    </div>
+  </div>
+  <div class="cp-inp-area">
+    <div class="cp-inp-row">
+      <textarea class="cp-inp" id="cpInp" placeholder="Alım yapmayı düşünüyorum..." rows="1"
+        onkeydown="cpKey(event)" oninput="cpResize(this)"></textarea>
+      <button class="cp-send" id="cpSend" onclick="cpSend()">↑</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ════════════════════════════════════════════════
+//  GOLD SENTINEL V3
+//  WebSocket: Finnhub (real-time tick, sub-second)
+//  Chart/Quote: Twelve Data (REST, on demand)
+// ════════════════════════════════════════════════
+
+// ── API KEYS — koda gömülü ───────────────────────
+// ⚠ Bu repo private olmalı! Public yapma.
+let FH_KEY = 'd6lcqd1r01qrq6i27j2gd6lcqd1r01qrq6i27j30';   // finnhub.io
+let TD_KEY = '49a925a728934981b38baab6907765f8'; // twelvedata.com
+
+// State
+let ws = null;
+let wsReconnectTimer = null;
+let currentPrice = 0;
+let prevTickPrice = 0;
+let openPrice = 0, highPrice = 0, lowPrice = 0;
+let tickCount = 0;
+let tickCountLast = 0;
+let tickWindow = [];           // last N ticks for rate calc
+let priceHistory = [];
+let customAlerts = [];
+let alertsOn = true;
+let totalFeedItems = 0;
+let chartInst = null;
+let currentTF = '1min';
+let spikeThreshold = 2.0;      // USD — configurable
+let aiLastRun = 0;
+let isFirst = true;
+let fsAutoCloseTimer = null;
+let fsCountdown = 10;
+let lastAlertTime = 0;
+let alertCooldown = 3000;      // ms between fullscreen alerts (avoid spam)
+
+// ── BOOT ON LOAD ─────────────────────────────────
+window.addEventListener('load', () => {
+  // Keys embedded — start directly
+  loadChartJS(boot);
+  // Keyboard shortcuts
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeFsAlert();
+  });
+  // Close threshold menu on outside click
+  document.addEventListener('click', e => {
+    const menu = document.getElementById('threshMenu');
+    if (menu && menu.style.display !== 'none' &&
+        !menu.contains(e.target) && !e.target.closest('.icon-btn')) {
+      menu.style.display = 'none';
+    }
+  });
+  // Start NY clock
+  startNYClock();
+});
+
+// ── BOOT ─────────────────────────────────────────
+function boot() {
+  // Fetch live news + calendar from Finnhub
+  fetchFinnhubAll();
+  // Refresh news every 5 minutes
+  setInterval(fetchFinnhubAll, 300000);
+  // First, get a baseline quote from Twelve Data (open/high/low)
+  fetchTDQuote();
+  fetchTDSeries(currentTF);
+
+  // Connect Finnhub WebSocket for real-time ticks
+  if (FH_KEY) {
+    connectWebSocket();
+  } else {
+    // fallback: poll TD every 10s
+    pushFeed('⚠️', 'Finnhub key yok — Twelve Data polling modunda (10s)', 'sys', 'UYARI');
+    setInterval(fetchTDQuote, 10000);
+    setWsStatus('error', 'TD POLLING');
+  }
+
+  // Twelve Data quote refresh every 60s (for open/high/low/52w)
+  setInterval(fetchTDQuote, 60000);
+  // Chart refresh every 3 min
+  setInterval(() => fetchTDSeries(currentTF), 180000);
+  // Tick rate counter
+  setInterval(updateTickRate, 10000);
+  // AI every 3 min
+  setInterval(runAI, 180000);
+  setTimeout(runAI, 15000);
+
+  if ('Notification' in window && Notification.permission === 'default') {
+    setTimeout(() => Notification.requestPermission(), 2000);
+  }
+}
+
+// ── FINNHUB WEBSOCKET ─────────────────────────────
+// Finnhub forex symbol for gold: "OANDA:XAU_USD"
+const FH_SYMBOL = 'OANDA:XAU_USD';
+
+function connectWebSocket() {
+  if (ws) { try { ws.close(); } catch(e){} }
+  setWsStatus('loading', 'BAĞLANIYOR');
+
+  ws = new WebSocket(`wss://ws.finnhub.io?token=${FH_KEY}`);
+
+  ws.addEventListener('open', () => {
+    ws.send(JSON.stringify({type:'subscribe', symbol: FH_SYMBOL}));
+    setWsStatus('connected', 'CANLI');
+    pushFeed('🟢', `Finnhub WebSocket bağlı → ${FH_SYMBOL}`, 'ws', 'WS');
+    clearTimeout(wsReconnectTimer);
+  });
+
+  ws.addEventListener('message', (event) => {
+    try {
+      const msg = JSON.parse(event.data);
+      if (msg.type === 'trade' && msg.data && msg.data.length > 0) {
+        // Pick latest trade
+        const trades = msg.data;
+        const latest = trades[trades.length - 1];
+        const price = latest.p;
+        const volume = latest.v || 0;
+        const ts = latest.t; // ms timestamp
+
+        onTick(price, ts);
+      } else if (msg.type === 'ping') {
+        ws.send(JSON.stringify({type:'pong'}));
+      }
+    } catch(e) {}
+  });
+
+  ws.addEventListener('close', (e) => {
+    setWsStatus('error', 'KESİLDİ');
+    pushFeed('🔴', `WebSocket bağlantısı kesildi (${e.code}). 5s sonra yeniden bağlanılıyor...`, 'sys', 'WS');
+    wsReconnectTimer = setTimeout(connectWebSocket, 5000);
+  });
+
+  ws.addEventListener('error', () => {
+    setWsStatus('error', 'HATA');
+  });
+}
+
+function setWsStatus(state, label) {
+  const pill = document.getElementById('wsPill');
+  const txt  = document.getElementById('wsStatus');
+  pill.className = 'ws-pill ' + (state === 'connected' ? 'connected' : state === 'error' ? 'error' : '');
+  txt.textContent = label;
+}
+
+// ── TICK HANDLER ──────────────────────────────────
+function onTick(price, ts) {
+  if (!price || isNaN(price)) return;
+
+  prevTickPrice = currentPrice || price;
+  currentPrice = price;
+  tickCount++;
+  tickWindow.push(Date.now());
+  // Keep only last 60s
+  const cutoff = Date.now() - 60000;
+  tickWindow = tickWindow.filter(t => t > cutoff);
+
+  const delta = currentPrice - prevTickPrice;
+  const absDelta = Math.abs(delta);
+
+  // Update price display
+  updatePriceUI(delta);
+
+  // Update scalper bar
+  updateScalperBar(delta);
+
+  // Track high/low (intraday from WS)
+  if (currentPrice > highPrice && highPrice > 0) highPrice = currentPrice;
+  if (currentPrice < lowPrice && lowPrice > 0) lowPrice = currentPrice;
+
+  // Critical spike check
+  checkSpike(delta, absDelta);
+
+  // Custom alerts
+  checkCustomAlerts();
+
+  // Tick counter display
+  document.getElementById('tickCtr').textContent = `TICKS: ${tickCount}`;
+
+  // Feed dot every 20 ticks
+  if (tickCount % 20 === 0) {
+    pushFeed('📡', `Tick #${tickCount} — $${currentPrice.toFixed(2)} — ${new Date(ts).toLocaleTimeString('tr-TR')}`, 'ws', 'TICK');
+  }
+
+  if (isFirst && currentPrice > 0) {
+    pushFeed('✅', `İlk tick alındı: $${currentPrice.toFixed(2)} — Finnhub WebSocket aktif`, 'ws', 'WS');
+    isFirst = false;
+  }
+}
+
+// ── PRICE UI ──────────────────────────────────────
+function updatePriceUI(delta) {
+  const el = document.getElementById('pNum');
+  const isUp = delta >= 0;
+  el.textContent = '$' + currentPrice.toFixed(2);
+  el.className = 'p-num ' + (delta > 0 ? 'up' : delta < 0 ? 'dn' : '');
+  setTimeout(() => { if (el.textContent === '$' + currentPrice.toFixed(2)) el.className = 'p-num'; }, 300);
+
+  const dayChange = openPrice ? currentPrice - openPrice : 0;
+  const dayPct    = openPrice ? (dayChange / openPrice * 100) : 0;
+  const pill = document.getElementById('chgPill');
+  if (openPrice) {
+    pill.textContent = `${dayChange>=0?'▲':'▼'} ${Math.abs(dayChange).toFixed(2)} (${dayPct>=0?'+':''}${dayPct.toFixed(2)}%)`;
+    pill.className = 'chg-pill ' + (dayChange >= 0 ? 'up' : 'dn');
+  }
+  document.getElementById('chgTime').textContent = new Date().toLocaleTimeString('tr-TR');
+
+  if (highPrice && lowPrice) {
+    document.getElementById('hiLo').textContent = `$${highPrice.toFixed(2)} / $${lowPrice.toFixed(2)}`;
+    document.getElementById('hiLoSub').textContent = `Aralık $${(highPrice-lowPrice).toFixed(2)}`;
+  }
+}
+
+// ── SCALPER BAR ───────────────────────────────────
+function updateScalperBar(delta) {
+  const spread = 0.35; // typical XAU/USD spread on free feeds
+  document.getElementById('sbBid').textContent = '$' + currentPrice.toFixed(2);
+  document.getElementById('sbAsk').textContent = '$' + (currentPrice + spread).toFixed(2);
+  document.getElementById('sbSpread').textContent = spread.toFixed(2);
+
+  const dayChange = openPrice ? currentPrice - openPrice : 0;
+  const dayPct    = openPrice ? (dayChange / openPrice * 100) : 0;
+  const sdEl = document.getElementById('sbDay');
+  sdEl.textContent = (dayChange>=0?'+':'') + dayChange.toFixed(2) + ' (' + (dayPct>=0?'+':'') + dayPct.toFixed(2) + '%)';
+  sdEl.style.color = dayChange >= 0 ? 'var(--green)' : 'var(--red)';
+
+  const mEl = document.getElementById('sbMove');
+  if (Math.abs(delta) > 0.005) {
+    mEl.textContent = (delta>0?'+':'') + delta.toFixed(2);
+    mEl.style.color = delta > 0 ? 'var(--green)' : 'var(--red)';
+  }
+}
+
+// ── TICK RATE ─────────────────────────────────────
+function updateTickRate() {
+  const rate = tickWindow.length; // ticks in last 60s
+  const rateEl = document.getElementById('tickRate');
+  rateEl.textContent = rate + '/dk';
+  rateEl.style.color = rate > 20 ? 'var(--red)' : rate > 5 ? 'var(--gold)' : 'var(--muted)';
+  document.getElementById('tickRateSub').textContent = `Son 60s • Toplam: ${tickCount}`;
+}
+
+// ── SPIKE DETECTION ───────────────────────────────
+function checkSpike(delta, absDelta) {
+  if (!alertsOn) return;
+  if (absDelta < spikeThreshold) return;
+
+  const now = Date.now();
+  if (now - lastAlertTime < alertCooldown) return; // cooldown
+  lastAlertTime = now;
+
+  const dir = delta > 0 ? 'YUKARI' : 'AŞAĞI';
+  const dirEmoji = delta > 0 ? '🚀' : '💥';
+  const msg = `${dirEmoji} ANİ ${dir}: ${absDelta.toFixed(2)} USD — $${currentPrice.toFixed(2)}`;
+
+  pushFeed(dirEmoji, msg, 'spike', 'ANİ');
+  showToast('spike', 'ANİ HAREKET', msg);
+  notify('XAUUSD ANİ HAREKET', msg);
+  showFsAlert(delta, absDelta);
+
+  document.getElementById('sbLastAlert').textContent = new Date().toLocaleTimeString('tr-TR') + ' · ' + absDelta.toFixed(2) + 'USD';
+}
+
+// ── FULLSCREEN ALERT ──────────────────────────────
+function showFsAlert(delta, absDelta) {
+  const isUp = delta > 0;
+  const dir = isUp ? '🟢 YUKARI' : '🔴 AŞAĞI';
+
+  document.getElementById('fsPrice').textContent = '$' + currentPrice.toFixed(2);
+  document.getElementById('fsPrice').className = 'fs-price ' + (isUp ? 'up' : 'dn');
+  document.getElementById('fsPips').textContent = (isUp ? '+' : '-') + absDelta.toFixed(2) + ' USD';
+  document.getElementById('fsPips').className = 'fs-pips ' + (isUp ? 'up' : 'dn');
+  document.getElementById('fsMove').textContent = dir + ' HAREKETİ';
+  document.getElementById('fsMove').className = 'fs-move ' + (isUp ? 'up' : 'dn');
+  document.getElementById('fsMsg').textContent =
+    `${absDelta.toFixed(2)} USD'lik ani hareket tespit edildi. ` +
+    `Fiyat: $${currentPrice.toFixed(2)} — ${new Date().toLocaleTimeString('tr-TR')}`;
+  document.getElementById('fsPulse').className = 'fs-pulse' + (isUp ? ' up-pulse' : '');
+
+  document.getElementById('fsAlert').style.display = 'flex';
+
+  // Auto-close in 10s
+  clearInterval(fsAutoCloseTimer);
+  fsCountdown = 10;
+  document.getElementById('fsAutoClose').textContent = `${fsCountdown} saniye sonra otomatik kapanır`;
+  fsAutoCloseTimer = setInterval(() => {
+    fsCountdown--;
+    const el = document.getElementById('fsAutoClose');
+    if (el) el.textContent = `${fsCountdown} saniye sonra otomatik kapanır`;
+    if (fsCountdown <= 0) closeFsAlert();
+  }, 1000);
+}
+
+function closeFsAlert() {
+  document.getElementById('fsAlert').style.display = 'none';
+  clearInterval(fsAutoCloseTimer);
+}
+
+// ── TWELVE DATA QUOTE ─────────────────────────────
+async function fetchTDQuote() {
+  try {
+    const r = await fetch(`https://api.twelvedata.com/quote?symbol=XAU/USD&apikey=${TD_KEY}`);
+    const d = await r.json();
+    if (d.code) throw new Error(d.message);
+
+    openPrice  = parseFloat(d.open);
+    highPrice  = Math.max(parseFloat(d.high), highPrice || 0) || parseFloat(d.high);
+    lowPrice   = (lowPrice > 0) ? Math.min(parseFloat(d.low), lowPrice) : parseFloat(d.low);
+
+    // If WS not connected yet, use TD price
+    if (!currentPrice || !FH_KEY) {
+      currentPrice = parseFloat(d.close);
+      const change = parseFloat(d.change);
+      updatePriceUI(change);
+      updateScalperBar(change);
+    }
+
+    // Momentum from TD
+    const change = parseFloat(d.change);
+    const abs = Math.abs(change);
+    let mom = '→ Sakin', sub = 'Düşük volatilite';
+    if (abs > 15) { mom = (change>0?'🚀 Güçlü Yük.':'💥 Güçlü Düş.'); sub = '⚡ Çok yüksek'; }
+    else if (abs > 8) { mom = (change>0?'↑ Yükseliyor':'↓ Düşüyor'); sub = 'Yüksek volatilite'; }
+    else if (abs > 3) { mom = (change>0?'↗ Zayıf Yük.':'↘ Zayıf Düş.'); sub = 'Orta volatilite'; }
+    document.getElementById('momVal').textContent = mom;
+    document.getElementById('momSub').textContent = sub;
+
+    const w52H = parseFloat(d?.fifty_two_week?.high || 0);
+    const w52L = parseFloat(d?.fifty_two_week?.low  || 0);
+    if (w52H && w52L) {
+      document.getElementById('w52').textContent = `$${w52H.toFixed(0)} / $${w52L.toFixed(0)}`;
+      const pos = ((currentPrice - w52L) / (w52H - w52L) * 100).toFixed(0);
+      document.getElementById('w52sub').textContent = `52H aralığında %${pos}`;
+    }
+
+    renderLevels();
+    hideBanner();
+  } catch(e) {
+    const msg = e.message || '';
+    if (msg.includes('Failed to fetch') || msg.includes('Network')) {
+      showBanner('⚠ Network hatası. Dosyayı VS Code Live Server ile aç (sağ tık → Open with Live Server). Hata: ' + msg);
+    } else {
+      showBanner('TD Hatası: ' + msg);
+    }
+  }
+}
+
+// ── TWELVE DATA SERIES ────────────────────────────
+async function fetchTDSeries(interval) {
+  document.getElementById('chartSpin').style.display = 'inline-block';
+  try {
+    const size = interval === '1day' ? 100 : 150;
+    const r = await fetch(`https://api.twelvedata.com/time_series?symbol=XAU/USD&interval=${interval}&outputsize=${size}&apikey=${TD_KEY}`);
+    const d = await r.json();
+    if (d.code || !d.values) throw new Error(d.message || 'Seri yok');
+    priceHistory = d.values.reverse().map(v => ({t:v.datetime, c:parseFloat(v.close)}));
+    drawChart();
+  } catch(e) {
+    showBanner('Grafik verisi alınamadı: ' + e.message);
+  }
+  document.getElementById('chartSpin').style.display = 'none';
+}
+
+// ── CHART ─────────────────────────────────────────
+function drawChart() {
+  if (!window.Chart || !priceHistory.length) return;
+  const ctx = document.getElementById('chart').getContext('2d');
+  const labels = priceHistory.map(p => {
+    const d = new Date(p.t);
+    return currentTF === '1day'
+      ? d.toLocaleDateString('tr-TR', {month:'short',day:'numeric'})
+      : d.toLocaleTimeString('tr-TR', {hour:'2-digit',minute:'2-digit'});
+  });
+  const prices = priceHistory.map(p => p.c);
+  const grad = ctx.createLinearGradient(0,0,0,200);
+  grad.addColorStop(0,'rgba(212,175,55,.25)');
+  grad.addColorStop(1,'rgba(212,175,55,0)');
+  if (chartInst) chartInst.destroy();
+  chartInst = new Chart(ctx, {
+    type:'line',
+    data:{labels,datasets:[{data:prices,borderColor:'#D4AF37',backgroundColor:grad,borderWidth:1.7,pointRadius:0,pointHoverRadius:4,tension:0.25,fill:true}]},
+    options:{
+      responsive:true,animation:{duration:300},interaction:{mode:'index',intersect:false},
+      scales:{
+        x:{ticks:{color:'#5C5C72',maxTicksLimit:10,font:{family:'Space Mono',size:8}},grid:{color:'rgba(37,37,48,.5)'}},
+        y:{position:'right',ticks:{color:'#5C5C72',font:{family:'Space Mono',size:8},callback:v=>'$'+v.toFixed(0)},grid:{color:'rgba(37,37,48,.5)'}}
+      },
+      plugins:{
+        legend:{display:false},
+        tooltip:{backgroundColor:'#16161C',borderColor:'#2E2E3C',borderWidth:1,titleColor:'#D4AF37',bodyColor:'#E2E2EE',titleFont:{family:'Space Mono',size:9},callbacks:{label:c=>' $'+c.raw.toFixed(2)}}
+      }
+    }
+  });
+}
+
+function switchTF(btn, tf) {
+  document.querySelectorAll('.tf').forEach(b=>b.classList.remove('act'));
+  btn.classList.add('act');
+  currentTF = tf;
+  fetchTDSeries(tf);
+}
+
+// ── KEY LEVELS ────────────────────────────────────
+function renderLevels() {
+  if (!currentPrice || !openPrice) return;
+  const pivot = (highPrice + lowPrice + openPrice) / 3;
+  const r1 = 2*pivot - lowPrice,  r2 = pivot + (highPrice - lowPrice);
+  const s1 = 2*pivot - highPrice, s2 = pivot - (highPrice - lowPrice);
+  const rows = [
+    {n:'R2 — Güçlü Direnç', v:r2, t:'res'},
+    {n:'R1 — Direnç',       v:r1, t:'res'},
+    {n:'Pivot',             v:pivot, t:'pvt'},
+    {n:'S1 — Destek',       v:s1, t:'sup'},
+    {n:'S2 — Güçlü Destek', v:s2, t:'sup'},
+    {n:'Gün Açılışı',       v:openPrice, t:'pvt'},
+  ];
+  document.getElementById('levelsBody').innerHTML = rows.map(row => {
+    const d = currentPrice - row.v;
+    const zone = Math.abs(d) < 2 ? ' current-zone' : '';
+    return `<div class="lv-row${zone}">
+      <span class="lv-name">${row.n}</span>
+      <div>
+        <div class="lv-val ${row.t}">$${row.v.toFixed(2)}</div>
+        <div class="lv-dist">${d>=0?'+':''}${d.toFixed(1)}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── CUSTOM ALERTS ─────────────────────────────────
+function addCustomAlert() {
+  const price = parseFloat(document.getElementById('aPrice').value);
+  const cond  = document.getElementById('aCond').value;
+  const note  = document.getElementById('aNote').value.trim();
+  if (!price || isNaN(price)) { alert('Geçerli fiyat girin'); return; }
+  customAlerts.push({id:Date.now(), price, cond, note, triggered:false});
+  document.getElementById('aPrice').value = '';
+  document.getElementById('aNote').value = '';
+  renderChips();
+  pushFeed('⚙️', `Uyarı: $${price} ${cond==='above'?'↑':'↓'}${note?' — '+note:''}`, 'level', 'AYAR');
+}
+function removeChip(id) { customAlerts = customAlerts.filter(a=>a.id!==id); renderChips(); }
+function renderChips() {
+  document.getElementById('chips').innerHTML = customAlerts.map(a => `
+    <div class="chip" style="${a.triggered?'opacity:.4':''}">
+      <span style="color:${a.cond==='above'?'var(--green)':'var(--red)'}">${a.cond==='above'?'▲':'▼'} $${a.price}</span>
+      ${a.note?`<span style="color:var(--muted)">${a.note}</span>`:''}
+      ${a.triggered?'<span style="font-size:8px;color:var(--muted)">✓</span>':''}
+      <span class="chip-x" onclick="removeChip(${a.id})">×</span>
+    </div>`).join('');
+}
+function checkCustomAlerts() {
+  if (!alertsOn || !currentPrice) return;
+  customAlerts.forEach(a => {
+    if (a.triggered) return;
+    if ((a.cond==='above' && currentPrice >= a.price) || (a.cond==='below' && currentPrice <= a.price)) {
+      a.triggered = true;
+      const msg = `HEDEF: $${a.price} ${a.cond==='above'?'↑ yukarı':'↓ aşağı'} kırıldı!${a.note?' — '+a.note:''}`;
+      pushFeed('🎯', msg, 'level', 'SEVİYE');
+      showToast('level', 'HEDEF KIRILDı', msg);
+      notify('Hedef Kırıldı', msg);
+      showFsAlert(a.cond==='above'?1:-1, Math.abs(currentPrice - a.price));
+      renderChips();
+    }
+  });
+}
+
+// ── THRESHOLD ─────────────────────────────────────
+function showThresholdMenu() {
+  const m = document.getElementById('threshMenu');
+  m.style.display = m.style.display === 'none' ? 'block' : 'none';
+  document.getElementById('threshInput').value = spikeThreshold;
+}
+function saveThreshold() {
+  const v = parseFloat(document.getElementById('threshInput').value);
+  if (v > 0) {
+    spikeThreshold = v;
+    document.getElementById('sbThresh').textContent = v.toFixed(1) + ' USD';
+    document.getElementById('threshMenu').style.display = 'none';
+    pushFeed('⚙️', `Uyarı eşiği güncellendi: ${v.toFixed(1)} USD`, 'sys', 'AYAR');
+  }
+}
+function setThresh(v) {
+  document.getElementById('threshInput').value = v;
+  saveThreshold();
+}
+
+// ── AI ─────────────────────────────────────────────
+async function runAI() {
+  if (Date.now() - aiLastRun < 60000 || !currentPrice) return;
+  aiLastRun = Date.now();
+  document.getElementById('aiDots').style.display = 'flex';
+
+  const pct    = openPrice ? ((currentPrice-openPrice)/openPrice*100).toFixed(2) : '0';
+  const trend  = currentPrice >= (openPrice||currentPrice) ? 'yukarı' : 'aşağı';
+  const range  = (highPrice - lowPrice).toFixed(2);
+  const pivot  = ((highPrice+lowPrice+openPrice)/3).toFixed(2);
+  const tRate  = tickWindow.length;
+  const aiNewsSrc = liveNews.length ? liveNews : newsData;
+  const newsStr = aiNewsSrc.slice(0,4).map(n=>n.title).join('; ');
+
+  const prompt = `Sen deneyimli bir XAUUSD scalper analistisin. Türkçe, kısa ve net yaz.
+
+Anlık veriler:
+• Fiyat: $${currentPrice.toFixed(2)}
+• Gün değişimi: %${pct} (${trend})
+• Gün aralığı: $${range} | Pivot: $${pivot}
+• WebSocket tick hızı: ${tRate} tick/dk
+• Gündem: ${newsStr}
+
+Scalper açısından: mevcut momentum, kritik yakın seviye ve dikkat edilmesi gereken 1 şeyi yaz. Son satır sadece: GÖRÜNÜM: YÜKSELİŞ / DÜŞÜŞ / NÖTR`;
+
+  try {
+    const resp = await fetch('/.netlify/functions/proxy', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:300,messages:[{role:'user',content:prompt}]})
+    });
+    const data = await resp.json();
+    const text = data.content?.[0]?.text || '';
+    document.getElementById('aiText').textContent = text;
+
+    let pills = `<span class="ai-pill pill-neu">AI Analizi</span>`;
+    if (/YÜKSELİŞ/i.test(text)) pills += `<span class="ai-pill pill-bull">↑ Yükselişçi</span>`;
+    else if (/DÜŞÜŞ/i.test(text)) pills += `<span class="ai-pill pill-bear">↓ Düşüşçü</span>`;
+    else pills += `<span class="ai-pill pill-neu">→ Nötr</span>`;
+    const p = parseFloat(pct);
+    pills += `<span class="ai-pill ${p>=0?'pill-bull':'pill-bear'}">Gün ${p>=0?'+':''}${pct}%</span>`;
+    pills += `<span class="ai-pill pill-neu">${tRate} tick/dk</span>`;
+    document.getElementById('aiFooter').innerHTML = pills;
+    pushFeed('🤖', text.substring(0,100)+(text.length>100?'...':''), 'ai', 'AI');
+  } catch(e) {
+    document.getElementById('aiText').textContent =
+      `$${currentPrice.toFixed(2)} — Gün %${pct} (${trend}). Aralık: $${range}. Pivot: $${pivot}. Tick hızı: ${tRate}/dk.`;
+  }
+  document.getElementById('aiDots').style.display = 'none';
+}
+
+// ── NEWS + CALENDAR — FINNHUB LIVE ────────────────
+let currentNewsTab = 'news';
+let liveNews = [];
+let liveCalendar = [];
+
+const impLbl = {hi:'YÜKSEK ETKİ', md:'ORTA ETKİ', lo:'DÜŞÜK ETKİ'};
+
+// Gold/forex relevant keywords for filtering & impact scoring
+const HIGH_KEYWORDS = ['gold','xau','fed','fomc','cpi','nfp','payroll','inflation','gdp','rate decision',
+  'powell','yellen','treasury','dxy','dollar','interest rate','pce','jobs','unemployment'];
+const MED_KEYWORDS  = ['china','war','oil','geopolit','bank','reserve','monetary','fiscal','tariff',
+  'ukraine','middle east','debt','bond','yield'];
+
+function keywordImpact(text) {
+  const t = text.toLowerCase();
+  if (HIGH_KEYWORDS.some(k => t.includes(k))) return 'hi';
+  if (MED_KEYWORDS.some(k => t.includes(k)))  return 'md';
+  return 'lo';
+}
+
+function timeAgo(ts) {
+  // ts can be unix seconds or ms
+  const ms  = ts > 1e12 ? ts : ts * 1000;
+  const diff = Math.floor((Date.now() - ms) / 1000);
+  if (diff < 60)   return diff + 's';
+  if (diff < 3600) return Math.floor(diff/60) + ' dk';
+  if (diff < 86400)return Math.floor(diff/3600) + ' sa';
+  return Math.floor(diff/86400) + ' gün';
+}
+
+function impactIcon(imp) {
+  return imp === 'hi' ? '🔴' : imp === 'md' ? '🟡' : '⚪';
+}
+
+// ── Fetch both news + calendar ─────────────────────
+async function fetchFinnhubAll() {
+  if (!FH_KEY) return;
+  showNewsLoading(true);
+  hideNewsError();
+  try {
+    await Promise.all([fetchFinnhubNews(), fetchFinnhubCalendar()]);
+  } catch(e) {
+    showNewsError('Haber verisi alınamadı: ' + e.message);
+  }
+  showNewsLoading(false);
+  renderNewsTab();
+}
+
+// ── Finnhub Market News (category: forex) ─────────
+async function fetchFinnhubNews() {
+  // Finnhub: category=general daha fazla altın/forex haberi içeriyor
+  const r = await fetch(`https://finnhub.io/api/v1/news?category=general&minId=0&token=${FH_KEY}`);
+  if (!r.ok) throw new Error('News HTTP ' + r.status);
+  const data = await r.json();
+  if (!Array.isArray(data)) throw new Error('Geçersiz haber verisi');
+
+  // Filter for gold/forex relevant, take latest 20
+  liveNews = data
+    .filter(n => n.headline && n.source)
+    .slice(0, 30)
+    .map(n => ({
+      title: n.headline,
+      src:   n.source,
+      url:   n.url || '#',
+      ts:    n.datetime,
+      imp:   keywordImpact(n.headline + ' ' + (n.summary || '')),
+      ico:   impactIcon(keywordImpact(n.headline)),
+      type:  'news'
+    }))
+    // Sort by impact then time
+    .sort((a,b) => {
+      const impOrder = {hi:0, md:1, lo:2};
+      if (impOrder[a.imp] !== impOrder[b.imp]) return impOrder[a.imp] - impOrder[b.imp];
+      return b.ts - a.ts;
+    })
+    .slice(0, 15);
+}
+
+// ── Finnhub Economic Calendar ──────────────────────
+async function fetchFinnhubCalendar() {
+  // Get events for this week + next week
+  const now   = new Date();
+  const from  = now.toISOString().split('T')[0];
+  const toD   = new Date(now.getTime() + 14*86400000).toISOString().split('T')[0];
+  const r = await fetch(
+    `https://finnhub.io/api/v1/calendar/economic?from=${from}&to=${toD}&token=${FH_KEY}`
+  );
+  if (!r.ok) {
+    // Takvim başarısız olursa sessizce geç, haberleri göster
+    console.warn('Calendar API:', r.status);
+    liveCalendar = getStaticCalendar();
+    return;
+  }
+  const data = await r.json();
+  const events = (data && data.economicCalendar) ? data.economicCalendar : [];
+  // Free tier boş dönebilir — statik takvimle doldur
+  if (!events.length) { liveCalendar = getStaticCalendar(); return; }
+
+  // Filter USD + high impact events relevant to gold
+  const goldKeywords = ['nonfarm','cpi','pce','gdp','fomc','fed','interest','unemployment',
+    'payroll','inflation','retail','ism','pmi','housing'];
+
+  liveCalendar = events
+    .filter(e => {
+      const country = (e.country || '').toLowerCase();
+      const ev      = (e.event  || '').toLowerCase();
+      return (country === 'us' || country === 'united states') &&
+             goldKeywords.some(k => ev.includes(k));
+    })
+    .map(e => {
+      // Parse event time — Finnhub returns date as "2024-01-05" or datetime
+      const evDate  = new Date(e.time || e.date);
+      const isPast  = evDate < now;
+      const imp     = e.impact === 'high' ? 'hi' : e.impact === 'medium' ? 'md' : 'lo';
+      return {
+        title:    e.event,
+        src:      'Ekonomik Takvim',
+        date:     evDate,
+        actual:   e.actual   != null ? e.actual   : null,
+        estimate: e.estimate != null ? e.estimate : null,
+        prev:     e.prev     != null ? e.prev     : null,
+        imp,
+        ico:      impactIcon(imp),
+        isPast,
+        type:     'cal'
+      };
+    })
+    .sort((a,b) => a.date - b.date)
+    .slice(0, 20);
+}
+
+// ── Tab switch ─────────────────────────────────────
+function switchNewsTab(tab) {
+  currentNewsTab = tab;
+  document.getElementById('tabNews').classList.toggle('act', tab === 'news');
+  document.getElementById('tabCal').classList.toggle('act',  tab === 'cal');
+  renderNewsTab();
+}
+
+// ── Render whichever tab is active ────────────────
+function renderNewsTab() {
+  if (currentNewsTab === 'news') renderLiveNews();
+  else                            renderCalendar();
+}
+
+function renderLiveNews() {
+  const el = document.getElementById('newsList');
+  if (!liveNews.length) {
+    el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:11px;font-family:Space Mono,monospace;">Haber yükleniyor...</div>';
+    return;
+  }
+  el.innerHTML = liveNews.map(n => `
+    <div class="nc ${n.imp}" onclick="window.open('${n.url}','_blank')" style="cursor:pointer;">
+      <div class="nc-ico">${n.ico}</div>
+      <div class="nc-body">
+        <div class="nc-imp">${impLbl[n.imp]}</div>
+        <div class="nc-ttl">${n.title}</div>
+        <div class="nc-meta"><span>${n.src}</span><span>${timeAgo(n.ts)} önce</span></div>
+      </div>
+    </div>`).join('');
+}
+
+function renderCalendar() {
+  const el = document.getElementById('newsList');
+  if (!liveCalendar.length) {
+    el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--muted);font-size:11px;font-family:Space Mono,monospace;">Takvim verisi yükleniyor...</div>';
+    return;
+  }
+  el.innerHTML = liveCalendar.map(e => {
+    const dateStr = e.date.toLocaleDateString('tr-TR', {weekday:'short', month:'short', day:'numeric'});
+    const timeStr = e.date.toLocaleTimeString('tr-TR', {hour:'2-digit', minute:'2-digit', timeZone:'America/New_York'}) + ' NY';
+    const trStr   = e.date.toLocaleTimeString('tr-TR', {hour:'2-digit', minute:'2-digit', timeZone:'Europe/Istanbul'}) + ' TR';
+    const past    = e.isPast ? 'opacity:.55;' : '';
+
+    let dataRow = '';
+    if (e.actual != null)   dataRow += `<span style="color:var(--green)">Gerçek: ${e.actual}</span> `;
+    if (e.estimate != null) dataRow += `<span style="color:var(--gold)">Tahmin: ${e.estimate}</span> `;
+    if (e.prev != null)     dataRow += `<span style="color:var(--muted)">Önceki: ${e.prev}</span>`;
+
+    return `<div class="nc ${e.imp}" style="${past}">
+      <div class="nc-ico">${e.ico}</div>
+      <div class="nc-body">
+        <div class="nc-imp">${impLbl[e.imp]} · ${dateStr}</div>
+        <div class="nc-ttl">${e.title}</div>
+        <div class="nc-meta" style="flex-direction:column;gap:3px;">
+          <span style="color:var(--gold)">${timeStr} · ${trStr}</span>
+          ${dataRow ? '<span>' + dataRow + '</span>' : ''}
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// Statik takvim — API boş dönerse göster
+function getStaticCalendar() {
+  const now = new Date();
+  const week = (d,h,m) => {
+    const dt = new Date(now);
+    dt.setDate(now.getDate() + d);
+    dt.setHours(h,m,0,0);
+    return dt;
+  };
+  return [
+    {title:'FOMC Meeting Minutes',date:week(1,14,0),imp:'hi',src:'Fed',isPast:false,actual:null,estimate:null,prev:null},
+    {title:'Initial Jobless Claims',date:week(3,13,30),imp:'md',src:'DOL',isPast:false,actual:null,estimate:'215K',prev:'218K'},
+    {title:'Core PCE Price Index',date:week(4,13,30),imp:'hi',src:'BEA',isPast:false,actual:null,estimate:'0.3%',prev:'0.2%'},
+    {title:'Nonfarm Payrolls (NFP)',date:week(7,13,30),imp:'hi',src:'BLS',isPast:false,actual:null,estimate:'180K',prev:'175K'},
+    {title:'Unemployment Rate',date:week(7,13,30),imp:'hi',src:'BLS',isPast:false,actual:null,estimate:'3.9%',prev:'3.9%'},
+    {title:'CPI Month-over-Month',date:week(9,13,30),imp:'hi',src:'BLS',isPast:false,actual:null,estimate:'0.3%',prev:'0.4%'},
+    {title:'Fed Interest Rate Decision',date:week(14,19,0),imp:'hi',src:'Fed',isPast:false,actual:null,estimate:'5.25%',prev:'5.25%'},
+    {title:'ISM Manufacturing PMI',date:week(2,15,0),imp:'md',src:'ISM',isPast:false,actual:null,estimate:'49.5',prev:'49.1'},
+  ].map(e=>({...e,ico:e.imp==='hi'?'🔴':'🟡',type:'cal'}));
+}
+
+function showNewsLoading(v) { document.getElementById('newsLoading').style.display = v ? 'block' : 'none'; }
+function showNewsError(msg) { const el=document.getElementById('newsError'); el.textContent=msg; el.style.display='block'; }
+function hideNewsError()    { document.getElementById('newsError').style.display='none'; }
+
+// Keep newsData for AI fallback
+const newsData = liveNews;
+
+// ── FEED ──────────────────────────────────────────
+function pushFeed(icon, msg, type, tag) {
+  totalFeedItems++;
+  document.getElementById('alertCnt').textContent = totalFeedItems > 99 ? '99+' : totalFeedItems;
+  const item = document.createElement('div');
+  item.className = 'fi';
+  item.innerHTML = `
+    <div class="fi-icon">${icon}</div>
+    <div class="fi-bd">
+      <span class="fi-tag tag-${type}">${tag}</span>
+      <div class="fi-msg">${msg}</div>
+      <div class="fi-time">${new Date().toLocaleTimeString('tr-TR')}</div>
+    </div>`;
+  const feed = document.getElementById('feed');
+  if (feed.firstChild?.style?.textAlign === 'center') feed.innerHTML = '';
+  feed.insertBefore(item, feed.firstChild);
+  while (feed.children.length > 80) feed.removeChild(feed.lastChild);
+}
+
+// ── TOAST ─────────────────────────────────────────
+function showToast(type, title, msg) {
+  if (!alertsOn) return;
+  const t = document.createElement('div');
+  t.className = `toast ${type}`;
+  t.innerHTML = `
+    <div class="toast-hd">
+      <span class="toast-ttl">${title}</span>
+      <span class="toast-x" onclick="this.closest('.toast').remove()">×</span>
+    </div>
+    <div class="toast-msg">${msg}</div>
+    <div class="toast-ts">${new Date().toLocaleTimeString('tr-TR')}</div>`;
+  document.getElementById('toasts').appendChild(t);
+  setTimeout(() => t.remove(), 7000);
+}
+
+function notify(title, body) {
+  if (!alertsOn) return;
+  if (Notification.permission === 'granted') new Notification('Gold Sentinel — ' + title, {body});
+}
+
+// ── CHATBOT PANEL ────────────────────────────────
+const CP_SYSTEM = `Sen SENTINEL AI'sın — XAUUSD (altın/dolar) üzerine uzmanlaşmış, kurumsal düzeyde düşünen bir trading danışmanısın. Milyonlarca dolar yöneten deneyimli bir trader gibi konuşursun: temkinli, analitik, ego'suz.
+
+UZMANLIK ALANLARIN:
+• Smart Money Concepts (SMC) — kurumsal para hareketleri
+• ICT metodolojisi — Inner Circle Trader konseptleri
+• Likidite analizi — Buy-side / Sell-side likidite, liquidity sweeps
+• FVG (Fair Value Gap) — dengesizlik bölgeleri, mitigation
+• Market Structure — BOS (Break of Structure), CHoCH (Change of Character)
+• Order Block analizi — bullish/bearish OB'ler
+• Risk yönetimi — pozisyon boyutlandırma, maksimum kayıp limitleri
+• Seans analizi — Londra, NY, Asya seans farkları ve XAU etkisi
+• Makro bağlam — DXY, Fed, enflasyon verilerinin altına etkisi
+
+YAKLAŞIM FELSEFENİ:
+• Her işlemi şüpheyle karşıla — bu işlem NEDEN kazandırır? diye sorgula
+• Risk/ödül oranı en az 1:2 olmalı, tercihen 1:3+
+• Asla acele ettirme — piyasa her zaman fırsat sunar
+• Confluences eksikse işlemi yapma
+• Duygusal kararları (FOMO, intikam tradei) sert eleştir
+• Belirsizlikte kenarda kal, zorla işlem kurma
+
+YANIT FORMATIN:
+• Türkçe, net ve doğrudan konuş — kısa ve keskin ol
+• Analizi şu sırayla yap: 1) Piyasa yapısı 2) Likidite 3) FVG/OB 4) Confluences 5) Risk 6) Karar
+• Yanıt sonunda mutlaka: KARAR: ALIM / SATIM / KENARDA KAL / BEKLE
+• Risk seviyesi: DÜŞÜK / ORTA / YÜKSEK
+• Stop loss ve hedef öner (mümkünse)
+
+ÖNEMLİ KISITLAMALAR:
+• Yüksek riskli işlemleri onaylama
+• R/R < 1:1.5 olan işlemleri eleştir
+• Garantici konuşma — bu finansal tavsiye değil, eğitim amaçlı istişaredir`;
+
+let cpHistory = [];
+let chatOpen = false;
+let cpTypingEl = null;
+
+function toggleChat() {
+  chatOpen = !chatOpen;
+  document.getElementById('chatPanel').classList.toggle('open', chatOpen);
+  document.getElementById('chatFab').classList.toggle('open', chatOpen);
+  if (chatOpen) setTimeout(()=>document.getElementById('cpInp').focus(), 300);
+}
+
+function cpQuick(text) {
+  document.getElementById('cpInp').value = text;
+  cpSend();
+}
+
+async function cpSend() {
+  const inp = document.getElementById('cpInp');
+  const text = inp.value.trim();
+  if (!text) return;
+  inp.value = ''; cpResize(inp);
+  document.getElementById('cpSend').disabled = true;
+
+  // Hide welcome
+  const welcome = document.querySelector('.cp-welcome');
+  if (welcome) welcome.remove();
+
+  cpAddUser(text);
+  cpHistory.push({role:'user', content: text});
+  cpShowTyping();
+
+  try {
+    // Build market context
+    const mCtx = currentPrice
+      ? `[Anlık Piyasa: XAU/USD $${currentPrice.toFixed(2)}, Gün açılış: $${openPrice.toFixed(2)}, H: $${highPrice.toFixed(2)}, L: $${lowPrice.toFixed(2)}, NY: ${getNYHourMin?getNYHourMin().h+':00':'—'}, Oturum: ${getSessionInfo?getSessionInfo().label:'—'}]`
+      : '[Piyasa verisi yükleniyor]';
+
+    const msgs = [
+      {role:'user', content: mCtx + '\n\n' + cpHistory[0].content},
+      ...cpHistory.slice(1)
+    ];
+
+    const resp = await fetch('/.netlify/functions/proxy',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:800,
+        system: CP_SYSTEM,
+        messages: msgs
+      })
+    });
+    const data = await resp.json();
+    const reply = data.content?.map(b=>b.text||'').join('') || 'Yanıt alınamadı.';
+    cpHistory.push({role:'assistant', content: reply});
+    cpRemoveTyping();
+    cpAddAI(reply);
+  } catch(e) {
+    cpRemoveTyping();
+    cpAddAI('⚠ Bağlantı hatası: ' + e.message);
+  }
+  document.getElementById('cpSend').disabled = false;
+}
+
+function cpAddUser(text) {
+  const el = document.createElement('div');
+  el.className = 'cp-msg-user';
+  el.innerHTML = `<div class="cp-msg-user-bbl">${cpEsc(text)}</div>`;
+  document.getElementById('cpMessages').appendChild(el);
+  el.scrollIntoView({behavior:'smooth',block:'end'});
+}
+
+function cpAddAI(text) {
+  const {html, verdict} = cpParseReply(text);
+  const el = document.createElement('div');
+  el.className = 'cp-msg-ai';
+  el.innerHTML = `
+    <div class="cp-avatar">⬡</div>
+    <div class="cp-bbl">
+      ${html}
+      ${verdict ? `<div>${verdict}</div>` : ''}
+    </div>`;
+  document.getElementById('cpMessages').appendChild(el);
+  el.scrollIntoView({behavior:'smooth',block:'end'});
+}
+
+function cpParseReply(text) {
+  let verdict = '';
+  const vm = text.match(/KARAR\s*[:：]\s*([^\n]+)/i);
+  if (vm) {
+    const v = vm[1].trim();
+    let cls = 'neut';
+    if (/ALIM/i.test(v)) cls='bull';
+    else if (/SATIM/i.test(v)) cls='bear';
+    else if (/BEKLE|KENARDA/i.test(v)) cls='warn';
+    verdict = `<span class="cp-verdict ${cls}">▸ ${cpEsc(v)}</span>`;
+  }
+  let html = cpEsc(text)
+    .replace(/\*\*(.+?)\*\*/g,'<strong>$1</strong>')
+    .replace(/KARAR\s*[:：]\s*[^\n]+/gi,'')
+    .replace(/\n{2,}/g,'<br><br>')
+    .replace(/\n/g,'<br>');
+  return {html, verdict};
+}
+
+function cpEsc(t){return t.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+function cpShowTyping() {
+  cpTypingEl = document.createElement('div');
+  cpTypingEl.className = 'cp-typing';
+  cpTypingEl.innerHTML = `
+    <div class="cp-avatar">⬡</div>
+    <div class="cp-typing-bbl">
+      <div class="cp-dot"></div><div class="cp-dot"></div><div class="cp-dot"></div>
+    </div>`;
+  document.getElementById('cpMessages').appendChild(cpTypingEl);
+  cpTypingEl.scrollIntoView({behavior:'smooth',block:'end'});
+}
+function cpRemoveTyping() { if (cpTypingEl) { cpTypingEl.remove(); cpTypingEl=null; } }
+function cpKey(e) { if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();cpSend();} }
+function cpResize(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,100)+'px';}
+
+// ── NY CLOCK + MARKET SESSION ────────────────────
+// NYMEX Gold (GC): 18:00 Sun – 17:00 Fri NY time, with 60-min daily break 17:00-18:00
+// Key sessions for XAU/USD scalping:
+//   London open:     03:00 NY  (major)
+//   NY open:         08:00 NY  (most volatile)
+//   NY close/NYMEX:  17:00 NY
+//   Asian session:   19:00-03:00 NY (thin)
+
+function getNYTime() {
+  // America/New_York — handles DST automatically via Intl
+  const now = new Date();
+  const nyStr = now.toLocaleString('en-US', {timeZone:'America/New_York',
+    hour:'2-digit', minute:'2-digit', second:'2-digit', hour12:false});
+  const [time] = nyStr.split(', ').length > 1 ? [nyStr.split(', ')[1]] : [nyStr];
+  return time; // HH:MM:SS
+}
+
+function getNYHourMin() {
+  const now = new Date();
+  const parts = new Intl.DateTimeFormat('en-US',{
+    timeZone:'America/New_York',
+    hour:'numeric', minute:'numeric', hour12:false
+  }).formatToParts(now);
+  const h = parseInt(parts.find(p=>p.type==='hour').value);
+  const m = parseInt(parts.find(p=>p.type==='minute').value);
+  return {h, m, total: h * 60 + m};
+}
+
+function getSessionInfo() {
+  const {h, total} = getNYHourMin();
+  const now = new Date();
+  const dow = new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',weekday:'short'}).format(now);
+
+  // NYMEX GC futures break: 17:00–18:00 NY daily
+  const inBreak   = (h === 17);
+  // Weekend: Fri 17:00 – Sun 18:00 NY
+  const weekend   = (dow === 'Sat') || (dow === 'Fri' && h >= 17) || (dow === 'Sun' && h < 18);
+
+  if (weekend)  return {label:'⛔ KAPALI',      color:'var(--muted)',  desc:'Hafta sonu'};
+  if (inBreak)  return {label:'⏸ MOLA',         color:'var(--muted)',  desc:'17:00–18:00 günlük ara'};
+
+  // Session windows (NY local time)
+  if (total >= 8*60 && total < 12*60)
+    return {label:'🔥 NY AÇILIŞ',   color:'var(--red)',    desc:'08:00–12:00 — En yüksek volatilite'};
+  if (total >= 12*60 && total < 17*60)
+    return {label:'🟡 NY ÖĞLEDEN',  color:'var(--gold)',   desc:'12:00–17:00 — Orta likidite'};
+  if (total >= 3*60 && total < 8*60)
+    return {label:'🟢 LONDON',      color:'var(--green)',  desc:'03:00–08:00 — Yüksek aktif'};
+  if (total >= 18*60 || total < 3*60)
+    return {label:'🔵 ASYA',        color:'var(--blue)',   desc:'18:00–03:00 — Düşük volatilite'};
+
+  return {label:'—', color:'var(--muted)', desc:'—'};
+}
+
+function getTimeToNymexClose() {
+  const {h, m} = getNYHourMin();
+  // NYMEX closes at 17:00 NY
+  let closeMin = 17 * 60;
+  let nowMin   = h * 60 + m;
+  let diff     = closeMin - nowMin;
+  if (diff < 0) diff += 24 * 60; // next day
+  const hh = Math.floor(diff / 60);
+  const mm  = diff % 60;
+  return hh > 0 ? `${hh}s ${mm}dk` : `${mm} dk`;
+}
+
+function startNYClock() {
+  function tick() {
+    const timeEl    = document.getElementById('sbNYTime');
+    const sessEl    = document.getElementById('sbSession');
+    const nymexEl   = document.getElementById('sbNymexClose');
+    if (!timeEl) return;
+
+    timeEl.textContent = getNYTime();
+
+    const sess = getSessionInfo();
+    sessEl.textContent  = sess.label;
+    sessEl.style.color  = sess.color;
+    sessEl.title        = sess.desc;
+
+    nymexEl.textContent = getTimeToNymexClose();
+  }
+  tick();
+  setInterval(tick, 1000);
+}
+
+// ── HELPERS ───────────────────────────────────────
+function toggleAlerts() {
+  alertsOn = !alertsOn;
+  document.getElementById('sw').className = 'sw' + (alertsOn ? ' on' : '');
+}
+function showBanner(msg) {
+  const el = document.getElementById('errBanner');
+  el.textContent = msg; el.style.display = 'block';
+}
+function hideBanner() {
+  document.getElementById('errBanner').style.display = 'none';
+}
+function loadChartJS(cb) {
+  if (window.Chart) { cb(); return; }
+  const s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js';
+  s.onload = cb;
+  document.head.appendChild(s);
+}
+</script>
+</body>
+</html>
