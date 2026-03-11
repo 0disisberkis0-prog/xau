@@ -1,3 +1,4 @@
+
 exports.handler = async function(event, context) {
   const headers = {
     'Access-Control-Allow-Origin': '*',
@@ -23,7 +24,7 @@ exports.handler = async function(event, context) {
     const apiKey = process.env.ANTHROPIC_KEY;
 
     if (!apiKey) {
-      return { statusCode: 500, headers, body: JSON.stringify({ error: 'API key not configured' }) };
+      return { statusCode: 500, headers, body: JSON.stringify({ error: 'API key not configured - check environment variables' }) };
     }
 
     const response = await fetch('https://api.anthropic.com/v1/messages', {
@@ -39,7 +40,12 @@ exports.handler = async function(event, context) {
     const text = await response.text();
     let data;
     try { data = JSON.parse(text); } 
-    catch(e) { return { statusCode: 500, headers, body: JSON.stringify({ error: 'Invalid API response' }) }; }
+    catch(e) { return { statusCode: 500, headers, body: JSON.stringify({ error: 'Invalid API response', raw: text.slice(0,300) }) }; }
+
+    // Hata varsa tam mesajı döndür
+    if (data.error) {
+      return { statusCode: response.status, headers, body: JSON.stringify({ error: JSON.stringify(data.error) }) };
+    }
 
     return { statusCode: 200, headers, body: JSON.stringify(data) };
 
