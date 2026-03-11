@@ -21,33 +21,47 @@ exports.handler = async function(event, context) {
     }
 
     const body = JSON.parse(event.body);
-    const apiKey = process.env.ANTHROPIC_KEY;
+    const apiKey = process.env.GROQ_KEY;
 
     if (!apiKey) {
-      return { statusCode: 500, headers, body: JSON.stringify({ error: 'API key not configured - check environment variables' }) };
+      return { statusCode: 500, headers, body: JSON.stringify({ error: 'API key not configured' }) };
     }
 
-    const response = await fetch('https://api.anthropic.com/v1/messages', {
+    // Groq API - OpenAI uyumlu format
+    const messages = [];
+    if (body.system) {
+      messages.push({ role: 'system', content: body.system });
+    }
+    messages.push(...body.messages);
+
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01'
+        'Authorization': `Bearer ${apiKey}`
       },
-      body: JSON.stringify(body)
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile',
+        max_tokens: body.max_tokens || 800,
+        messages: messages
+      })
     });
 
     const text = await response.text();
     let data;
-    try { data = JSON.parse(text); } 
-    catch(e) { return { statusCode: 500, headers, body: JSON.stringify({ error: 'Invalid API response', raw: text.slice(0,300) }) }; }
+    try { data = JSON.parse(text); }
+    catch(e) { return { statusCode: 500, headers, body: JSON.stringify({ error: 'Invalid API response' }) }; }
 
-    // Hata varsa tam mesajı döndür
     if (data.error) {
       return { statusCode: response.status, headers, body: JSON.stringify({ error: JSON.stringify(data.error) }) };
     }
 
-    return { statusCode: 200, headers, body: JSON.stringify(data) };
+    // Groq yanıtını Anthropic formatına çevir
+    const converted = {
+      content: [{ type: 'text', text: data.choices?.[0]?.message?.content || '' }]
+    };
+
+    return { statusCode: 200, headers, body: JSON.stringify(converted) };
 
   } catch (err) {
     return { statusCode: 500, headers, body: JSON.stringify({ error: err.message }) };
